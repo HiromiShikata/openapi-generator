@@ -1,722 +1,2325 @@
-openapi: 3.0.0
-servers:
-  - url: 'http://petstore.swagger.io/v2'
+openapi: 3.0.2
 info:
-  description: >-
-    This is a sample server Petstore server. For this sample, you can use the api key
-    `special-key` to test the authorization filters.
-  version: 1.0.0
-  title: OpenAPI Petstore
-  license:
-    name: Apache-2.0
-    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
-tags:
-  - name: pet
-    description: Everything about your Pets
-  - name: store
-    description: Access to Petstore orders
-  - name: user
-    description: Operations about user
+  title: Monorepo API
+  version: 0.0.1
+  description: |
+    ## Data Format
+    - ID - UUID v4
+    - Datetime - UTC, RFC3339, section 5.6 (ISO 8601 extended format). yyyy-MM-ddTHH:mm:ssZ
+
+    ## POST, PUT 時に設定するデータについて
+    - 新しく採番が必要な ID はサーバー側で採番しますので POST 時は空欄で大丈夫です
+    - CreatedAt, UpdatedAt, DeletedAt 等の日時もサーバーで設定しますので POST 時, PUT 時の設定不要です mm
+
+    ## Credit card information for test
+    - [ja](https://faq.gmo-pg.com/service/detail.aspx?id=1679&a=102&isCrawler=1)
+    - [en](https://www.paypalobjects.com/en_GB/vhelp/paypalmanager_help/credit_card_numbers.htm)
+
+    ## Quick Cash UseCase
+    1. (netive用)AccessToken取得 POST /members/findByMiney
+    1. (netive用)oneTimeToken取得 POST /members/{memberId}/oneTimeTokens/register
+    1. (webView用)AccessToken取得 POST /oneTimeTokens/{oneTimeToken}/revoke
+    1. 会員新規登録 POST /members/register
+    1. 会員新規登録認証コード入力 POST /members/register/verifySms
+    1. ログイン会員情報取得 GET /me
+    1. 規約同意登録 PUT /members/{memberId}/agreements/{agreementType}
+    1. 会員ログインsms入力 POST /members/login
+    1. 会員ログイン認証コード入力 POST /members/login/verifySms
+    1. 会員規約同意状況取得 GET /members/{memberId}/agreements/{agreementType}
+    1. 会員商品画像登録 POST /members/{memberId}/items
+    1. 会員商品画像認識結果取得 GET /members/{memberId}/items/{itemId}/negotiations/latest
+    1. 会員売却登録 POST /members/{memberId}/items/{itemId}/negotiations/established
+    1. 会員身分証明書画像登録 POST /members/{memberId}/identificationPhotos
+    1. 会員身分証明書提出 POST /members/{memberId}/identificationStatuses/requestVerify
+    1. 会員配送先取得 GET /members/{memberId}/address
+    1. 会員情報登録 PUT /members/{memberId}
+    1. 会員クレジットカード登録 PUT /members/{memberId}/creditCard
+    1. オーソリ POST /members/{memberId}/items/{itemId}/negotiations/{negotiationId}/creditAuthorizations/authorize
+    1. (ベリトランスから) GET(多分) /creditAuthorizations/{creditAuthorizationId}/veritrans/result
+    1. オーソリ結果取得 GET /members/{memberId}/items/{itemId}/negotiations/{memberItemNegotiationId}/creditAuthorizations/latest
+    1. 会員銀行口座登録 PUT /members/{memberId}/bankAccount
+    1. 集荷登録 POST /members/{memberId}/toOfficeDeliveries
+    1. 集荷状況取得 GET /members/{memberId}/toOfficeDeliveries
+
+    ## Operator Console UseCase
+    1. POST /operators/login
+    1. GET /members
+    1. GET /members/{memberId}
+    1. GET /members/{memberId}/bankAccount
+    1. GET /memberToOfficeDeliveries
+    1. GET /memberToOfficeDeliveries/{memberToOfficeDeliveryId}
+
+
+servers:
+  - url: http://localhost:3000
+    description: local
+  - url: https://api.monorepo-dev.sou-dev.com
+    description: dev
+  - url: https://api.monorepo-stg.sou-dev.com
+    description: stg
+
 paths:
-  /pet:
+  /healthCheck:
+    get:
+      responses:
+        200:
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: ok
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members:
+    get:
+      security:
+        - OperatorBearerAuth: []
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /members/findByMiney:
     post:
-      tags:
-        - pet
-      summary: Add a new pet to the store
-      description: ''
-      operationId: addPet
-      responses:
-        '405':
-          description: Invalid input
-      security:
-        - petstore_auth:
-            - 'write:pets'
-            - 'read:pets'
       requestBody:
-        $ref: '#/components/requestBodies/Pet'
-    put:
-      tags:
-        - pet
-      summary: Update an existing pet
-      description: ''
-      operationId: updatePet
+        $ref: '#/components/requestBodies/MemberFindByMineyBody'
       responses:
-        '400':
-          description: Invalid ID supplied
-        '404':
-          description: Pet not found
-        '405':
-          description: Validation exception
-      security:
-        - petstore_auth:
-            - 'write:pets'
-            - 'read:pets'
-      requestBody:
-        $ref: '#/components/requestBodies/Pet'
-  /pet/findByStatus:
-    get:
-      tags:
-        - pet
-      summary: Finds Pets by status
-      description: Multiple status values can be provided with comma separated strings
-      operationId: findPetsByStatus
-      parameters:
-        - name: status
-          in: query
-          description: Status values that need to be considered for filter
-          required: true
-          style: form
-          explode: false
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - available
-                - pending
-                - sold
-              default: available
-      responses:
-        '200':
-          description: successful operation
+        200:
+          description: Success
           content:
-            application/xml:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Pet'
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Pet'
-        '400':
-          description: Invalid status value
-      security:
-        - petstore_auth:
-            - 'read:pets'
-  /pet/findByTags:
-    get:
-      tags:
-        - pet
-      summary: Finds Pets by tags
-      description: >-
-        Multiple tags can be provided with comma separated strings. Use tag1,
-        tag2, tag3 for testing.
-      operationId: findPetsByTags
-      parameters:
-        - name: tags
-          in: query
-          description: Tags to filter by
-          required: true
-          style: form
-          explode: false
-          schema:
-            type: array
-            items:
-              type: string
-      responses:
-        '200':
-          description: successful operation
+                $ref: '#/components/schemas/MonorepoMemberAccessToken'
+        400:
+          description: Bad Reqeust (invalid number)
           content:
-            application/xml:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Pet'
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Pet'
-        '400':
-          description: Invalid tag value
-      security:
-        - petstore_auth:
-            - 'read:pets'
-      deprecated: true
-  '/pet/{petId}':
-    get:
-      tags:
-        - pet
-      summary: Find pet by ID
-      description: Returns a single pet
-      operationId: getPetById
-      parameters:
-        - name: petId
-          in: path
-          description: ID of pet to return
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: successful operation
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
           content:
-            application/xml:
-              schema:
-                $ref: '#/components/schemas/Pet'
             application/json:
               schema:
-                $ref: '#/components/schemas/Pet'
-        '400':
-          description: Invalid ID supplied
-        '404':
-          description: Pet not found
-      security:
-        - api_key: []
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/oneTimeTokens/register:
     post:
-      tags:
-        - pet
-      summary: Updates a pet in the store with form data
-      description: ''
-      operationId: updatePetWithForm
-      parameters:
-        - name: petId
-          in: path
-          description: ID of pet that needs to be updated
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '405':
-          description: Invalid input
       security:
-        - petstore_auth:
-            - 'write:pets'
-            - 'read:pets'
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                name:
-                  description: Updated name of the pet
-                  type: string
-                status:
-                  description: Updated status of the pet
-                  type: string
-    delete:
-      tags:
-        - pet
-      summary: Deletes a pet
-      description: ''
-      operationId: deletePet
+        - MemberBearerAuth: []
       parameters:
-        - name: api_key
-          in: header
-          required: false
+        - name: memberId
+          in: path
+          required: true
           schema:
             type: string
-        - name: petId
-          in: path
-          description: Pet id to delete
-          required: true
-          schema:
-            type: integer
-            format: int64
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+
       responses:
-        '400':
-          description: Invalid pet value
-      security:
-        - petstore_auth:
-            - 'write:pets'
-            - 'read:pets'
-  '/pet/{petId}/uploadImage':
-    post:
-      tags:
-        - pet
-      summary: uploads an image
-      description: ''
-      operationId: uploadFile
-      parameters:
-        - name: petId
-          in: path
-          description: ID of pet to update
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: successful operation
+        201:
+          description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
-      security:
-        - petstore_auth:
-            - 'write:pets'
-            - 'read:pets'
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                additionalMetadata:
-                  description: Additional data to pass to server
-                  type: string
-                file:
-                  description: file to upload
-                  type: string
-                  format: binary
-  /store/inventory:
-    get:
-      tags:
-        - store
-      summary: Returns pet inventories by status
-      description: Returns a map of status codes to quantities
-      operationId: getInventory
+                $ref: '#/components/schemas/MemberOneTimeToken'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /oneTimeTokens/{oneTimeToken}/revoke:
+    post:
+      description: oneTimeTokenを元にaccessTokenを取得
+      parameters:
+        - name: oneTimeToken
+          in: path
+          required: true
+          schema:
+            type: string
+            example: a7b09d24-aec2-48e3-87bb-c1d919978fea
+
       responses:
-        '200':
-          description: successful operation
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessToken'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/register:
+    post:
+      requestBody:
+        $ref: '#/components/requestBodies/MemberRegisterBody'
+      responses:
+        204:
+          description: No Content
+        400:
+          description: Bad Reqeust (invalid number)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/register/verifySms:
+    post:
+      requestBody:
+        $ref: '#/components/requestBodies/MemberRegisterVerifySmsBody'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessToken'
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/login:
+    post:
+      description: |
+        ユーザー未登録時 200
+      requestBody:
+        $ref: '#/components/requestBodies/MemberLoginBody'
+      responses:
+        204:
+          description: No Content
+        400:
+          description: Bad Reqeust (invalid number)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/login/verifySms:
+    post:
+      requestBody:
+        $ref: '#/components/requestBodies/MemberLoginVerifySmsBody'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessToken'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /me:
+    get:
+      security:
+        - MemberBearerAuth: []
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /members/{memberId}/agreements/{agreementType}:
+    get:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: agreementType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: ['termsOfService-v20191202','privacyPolicy-v20191202']
+            example: termsOfService-v20191202
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberAgreement'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: agreementType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: ['termsOfService-v20191202','privacyPolicy-v20191202']
+            example: termsOfService-v20191202
+      responses:
+        204:
+          description: No Content
+        400:
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /members/{memberId}/items:
+    post:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      requestBody:
+        $ref: '#/components/requestBodies/MemberItemBody'
+
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberItem'
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/items/{itemId}/negotiations/latest:
+    get:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberItemNegotiation'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /members/{memberId}/items/{itemId}/negotiations/{memberItemNegotiationId}/established:
+    post:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: memberItemNegotiationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        204:
+          description: No Content
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/items/{itemId}/negotiations/{memberItemNegotiationId}/creditAuthorizations/authorize:
+    post:
+      description: |
+        [ベリトランス 3D Secure Payment シーケンス](https://www.veritrans.co.jp/developer/air/en/direct_mpi.html)の [MPI Payment request()](https://air.veritrans.co.jp/vtdirect/v1/mpi_charges) を実行するAPIです
+
+        ベリトランスがhtml生成に使うんであろうクライアントの情報も要求されているのでパラメーターにて受け取らせてください。
+
+        各項目は[/mpi_charges](https://www.veritrans.co.jp/developer/air/en/direct_api.html#mpicharge)の呼び出し時に使うものを指定していただく想定です :bow:
+
+        ## backend 実装者向け情報
+        ### table: creditAuthorizationVeritrans (案)
+        - id: string
+        - memberId: string
+        - negotiationId: string
+        - grossAmount: number
+        - mpiStatus: string
+        - cardStatus: string
+        - paymentTransactionId: string
+        - frontendCompleteUrl: string
+        - createdAt: datetime
+        - updatedAt: datetime
+
+
+        ### Veritrans
+        #### Document
+        - [内部で呼び出すベリトランスのAPI](https://www.veritrans.co.jp/developer/air/en/direct_api.html#mpicharge)
+        #### Fields (一瞬考えたのでメモです)
+        ##### Header
+        - secret_key: Config 経由の環境変数
+        ##### Request Body
+        - order_id: creditAuthorizationId
+        - token_id: browser から受け取る
+        - gross_amount:
+          - (仮実装)negotiation.proposedPrice * 1.1 + 1000
+          - 小数点切り上げ
+          - [計算式から変わる可能性あり、biz確認中](https://github.com/sou-project/quick-cash/issues/140)
+        - service_option_type: mpi-complete
+        - push_uri: ${BASE_URL}/creditAuthorizations/{creditAuthorizationId}/veritrans/result
+        - redirection_uri: ${BASE_URL}/creditAuthorizations/{creditAuthorizationId}/veritrans/complete  パラメーターで受け取るredirectionUri
+        - http_user_agent: フロントからのリクエスト時に受け取るuaで良い気がする
+        - http_accept: 'text/html, application/xhtml+xml, */*' 固定で良い気がする(api へのrequest は application/json のみだった)
+        - with_capture: false
+        - test_mode: config 経由の環境変数で良いような
+        - memo1: (いつか管理画面の urlでも入れたら便利ですかね)
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: memberItemNegotiationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: user-agent
+          in: header
+          required: true
+          schema:
+            type: string
+            example: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36"
+      requestBody:
+        $ref: '#/components/requestBodies/AuthorizeCreditAuthorizationBody'
+      responses:
+        200:
+          description: Success
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: integer
-                  format: int32
-      security:
-        - api_key: []
-  /store/order:
-    post:
-      tags:
-        - store
-      summary: Place an order for a pet
-      description: ''
-      operationId: placeOrder
-      responses:
-        '200':
-          description: successful operation
+                properties:
+                  responseContents:
+                    type: string
+                    example: "\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 ....(abbr"
+
+        400:
+          description: Bad Reqeust
           content:
-            application/xml:
-              schema:
-                $ref: '#/components/schemas/Order'
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
-        '400':
-          description: Invalid Order
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Order'
-        description: order placed for purchasing the pet
-        required: true
-  '/store/order/{orderId}':
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/items/{itemId}/negotiations/{memberItemNegotiationId}/creditAuthorizations/latest:
     get:
-      tags:
-        - store
-      summary: Find purchase order by ID
-      description: >-
-        For valid response try integer IDs with value <= 5 or > 10. Other values
-        will generated exceptions
-      operationId: getOrderById
+      description: |
+        ## Backend 実装者向け情報
+        repository 内の処理でベリトランスから結果を取得済みであればDBの内容で返却、なければベリトランスに問い合わせ後DBに補完してから返す
+
+        ### Veritrans
+        #### Documents
+        - []結果情報取得API](https://www.veritrans.co.jp/developer/air/en/direct_api.html#search)
+
+        #### Fields (調査時に考えた内容のメモです)
+        ##### Header
+        - Authorization: Config経由の環境変数
+        ##### Parameters
+        - request_id: (これのみでいいらしい)
+
       parameters:
-        - name: orderId
+        - name: memberId
           in: path
-          description: ID of pet that needs to be fetched
           required: true
           schema:
-            type: integer
-            format: int64
-            minimum: 1
-            maximum: 5
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/xml:
-              schema:
-                $ref: '#/components/schemas/Order'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Order'
-        '400':
-          description: Invalid ID supplied
-        '404':
-          description: Order not found
-    delete:
-      tags:
-        - store
-      summary: Delete purchase order by ID
-      description: >-
-        For valid response try integer IDs with value < 1000. Anything above
-        1000 or nonintegers will generate API errors
-      operationId: deleteOrder
-      parameters:
-        - name: orderId
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: itemId
           in: path
-          description: ID of the order that needs to be deleted
           required: true
           schema:
             type: string
-      responses:
-        '400':
-          description: Invalid ID supplied
-        '404':
-          description: Order not found
-  /user:
-    post:
-      tags:
-        - user
-      summary: Create user
-      description: This can only be done by the logged in user.
-      operationId: createUser
-      responses:
-        default:
-          description: successful operation
-      security:
-        - auth_cookie: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/User'
-        description: Created user object
-        required: true
-  /user/createWithArray:
-    post:
-      tags:
-        - user
-      summary: Creates list of users with given input array
-      description: ''
-      operationId: createUsersWithArrayInput
-      responses:
-        default:
-          description: successful operation
-      security:
-        - auth_cookie: []
-      requestBody:
-        $ref: '#/components/requestBodies/UserArray'
-  /user/createWithList:
-    post:
-      tags:
-        - user
-      summary: Creates list of users with given input array
-      description: ''
-      operationId: createUsersWithListInput
-      responses:
-        default:
-          description: successful operation
-      security:
-        - auth_cookie: []
-      requestBody:
-        $ref: '#/components/requestBodies/UserArray'
-  /user/login:
-    get:
-      tags:
-        - user
-      summary: Logs user into the system
-      description: ''
-      operationId: loginUser
-      parameters:
-        - name: username
-          in: query
-          description: The user name for login
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-zA-Z0-9]+[a-zA-Z0-9\.\-_]*[a-zA-Z0-9]+$'
-        - name: password
-          in: query
-          description: The password for login in clear text
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: successful operation
-          headers:
-            Set-Cookie:
-              description: >-
-                Cookie authentication key for use with the `auth_cookie`
-                apiKey authentication.
-              schema:
-                type: string
-                example: AUTH_KEY=abcde12345; Path=/; HttpOnly
-            X-Rate-Limit:
-              description: calls per hour allowed by the user
-              schema:
-                type: integer
-                format: int32
-            X-Expires-After:
-              description: date in UTC when toekn expires
-              schema:
-                type: string
-                format: date-time
-          content:
-            application/xml:
-              schema:
-                type: string
-            application/json:
-              schema:
-                type: string
-        '400':
-          description: Invalid username/password supplied
-  /user/logout:
-    get:
-      tags:
-        - user
-      summary: Logs out current logged in user session
-      description: ''
-      operationId: logoutUser
-      responses:
-        default:
-          description: successful operation
-      security:
-        - auth_cookie: []
-  '/user/{username}':
-    get:
-      tags:
-        - user
-      summary: Get user by user name
-      description: ''
-      operationId: getUserByName
-      parameters:
-        - name: username
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: memberItemNegotiationId
           in: path
-          description: The name that needs to be fetched. Use user1 for testing.
           required: true
           schema:
             type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
       responses:
-        '200':
-          description: successful operation
+        200:
+          description: Success
           content:
-            application/xml:
-              schema:
-                $ref: '#/components/schemas/User'
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
-        '400':
-          description: Invalid username supplied
-        '404':
-          description: User not found
+                $ref: '#/components/schemas/CreditAuthorization'
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /members/{memberId}/identificationPhotos:
+    post:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      requestBody:
+        $ref: '#/components/requestBodies/MemberIdentificationPhotoBody'
+
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberIdentificationPhoto'
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MemberIdentificationPhoto'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/identificationStatuses/requestVerify:
+    post:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        204:
+          description: No Content
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        409:
+          description: Duplicate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}:
     put:
-      tags:
-        - user
-      summary: Updated user
-      description: This can only be done by the logged in user.
-      operationId: updateUser
+      security:
+        - MemberBearerAuth: []
       parameters:
-        - name: username
+        - name: memberId
           in: path
-          description: name that need to be deleted
           required: true
           schema:
             type: string
-      responses:
-        '400':
-          description: Invalid user supplied
-        '404':
-          description: User not found
-      security:
-        - auth_cookie: []
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
       requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/User'
-        description: Updated user object
-        required: true
-    delete:
-      tags:
-        - user
-      summary: Delete user
-      description: This can only be done by the logged in user.
-      operationId: deleteUser
+        $ref: '#/components/requestBodies/MemberBody'
+      responses:
+        204:
+          description: Created
+        400:
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      security:
+        - MemberBearerAuth: []
+        - OperatorBearerAuth: []
       parameters:
-        - name: username
+        - name: memberId
           in: path
-          description: The name that needs to be deleted
           required: true
           schema:
             type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
       responses:
-        '400':
-          description: Invalid username supplied
-        '404':
-          description: User not found
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/creditCard:
+    put:
       security:
-        - auth_cookie: []
-externalDocs:
-  description: Find out more about Swagger
-  url: 'http://swagger.io'
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      requestBody:
+        $ref: '#/components/requestBodies/MemberCreditCardBody'
+      responses:
+        204:
+          description: No Content
+        400:
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberCreditCard'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/bankAccount:
+    put:
+      security:
+        - MemberBearerAuth: []
+        - OperatorBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      requestBody:
+        $ref: '#/components/requestBodies/MemberBankAccountBody'
+      responses:
+        204:
+          description: No Content
+        400:
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberBankAccount'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /members/{memberId}/toOfficeDeliveries:
+    post:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      requestBody:
+        $ref: '#/components/requestBodies/MemberToOfficeDeliveryBody'
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberToOfficeDelivery'
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      description: created_atの降順でresponseが返されます
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MemberToOfficeDelivery'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /operators/login:
+    post:
+      tags:
+        - wip
+      requestBody:
+        $ref: '#/components/requestBodies/OperatorLoginBody'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessToken'
+        400:
+          description: Bad Reqeust
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'       
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /memberToOfficeDeliveries:
+    get:
+      security:
+        - OperatorBearerAuth: []
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                description: orderd by createdAt
+                items:
+                  $ref: '#/components/schemas/MemberToOfficeDelivery'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /memberToOfficeDeliveries/{memberToOfficeDeliveryId}:
+    get:
+      security:
+        - OperatorBearerAuth: []
+      parameters:
+        - name: memberToOfficeDeliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberToOfficeDelivery'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+
+
+
+  /creditAuthorizations/{creditAuthorizationId}/veritrans/result:
+    post:
+      security:
+        - VeritransBasicAuth: []
+      parameters:
+        - name: creditAuthorizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      requestBody:
+        $ref: '#/components/requestBodies/VeritransPushNotificationBody'
+      responses:
+        204:
+          description: No Content
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /creditAuthorizations/{creditAuthorizationId}/veritrans/complete:
+    post:
+      security:
+        - VeritransBasicAuth: []
+      parameters:
+        - name: creditAuthorizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+      requestBody:
+        $ref: '#/components/requestBodies/VeritransCompleteBody'
+      responses:
+        302:
+          description: Found
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /images/members/{memberId}/items/{itemId}/{itemPhotoId}.{extension}:
+    get:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: itemPhotoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: extension
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: ['png', 'jpg', 'jpeg']
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataUrlImage'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /images/members/{memberId}/identifications/{identificationId}.{extension}:
+    get:
+      security:
+        - MemberBearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: identificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid-v4
+            example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        - name: extension
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: ['png', 'jpg', 'jpeg']
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataUrlImage'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
 components:
-  requestBodies:
-    UserArray:
-      content:
-        application/json:
-          schema:
-            type: array
-            items:
-              $ref: '#/components/schemas/User'
-      description: List of user object
-      required: true
-    Pet:
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Pet'
-        application/xml:
-          schema:
-            $ref: '#/components/schemas/Pet'
-      description: Pet object that needs to be added to the store
-      required: true
-  securitySchemes:
-    petstore_auth:
-      type: oauth2
-      flows:
-        implicit:
-          authorizationUrl: 'http://petstore.swagger.io/api/oauth/dialog'
-          scopes:
-            'write:pets': modify pets in your account
-            'read:pets': read your pets
-    api_key:
-      type: apiKey
-      name: api_key
-      in: header
-    auth_cookie:
-      type: apiKey
-      name: AUTH_KEY
-      in: cookie
   schemas:
-    Order:
-      title: Pet Order
-      description: An order for a pets from the pet store
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        petId:
-          type: integer
-          format: int64
-        quantity:
-          type: integer
-          format: int32
-        shipDate:
-          type: string
-          format: date-time
-        status:
-          type: string
-          description: Order Status
-          enum:
-            - placed
-            - approved
-            - delivered
-        complete:
-          type: boolean
-          default: false
-      xml:
-        name: Order
-    Category:
-      title: Pet category
-      description: A category for a pet
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-          pattern: '^[a-zA-Z0-9]+[a-zA-Z0-9\.\-_]*[a-zA-Z0-9]+$'
-      xml:
-        name: Category
-    User:
-      title: a User
-      description: A User who is purchasing from the pet store
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        username:
-          type: string
-        firstName:
-          type: string
-        lastName:
-          type: string
-        email:
-          type: string
-        password:
-          type: string
-        phone:
-          type: string
-        userStatus:
-          type: integer
-          format: int32
-          description: User Status
-      xml:
-        name: User
-    Tag:
-      title: Pet Tag
-      description: A tag for a pet
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-      xml:
-        name: Tag
-    Pet:
-      title: a Pet
-      description: A pet for sale in the pet store
+    MemberRequestBody:
       type: object
       required:
-        - name
-        - photoUrls
+        - firstName
+        - lastName
+        - firstNameKana
+        - lastNameKana
+        - birthYmd
+        - job
+        - email
+        - phoneNumber
+      properties:
+        firstName:
+          type: string
+          example: 花子
+        lastName:
+          type: string
+          example: 山田
+        firstNameKana:
+          type: string
+          example: ハナコ
+        lastNameKana:
+          type: string
+          example: ヤマダ
+        birthYmd:
+          type: string
+          example: '19850101'
+          format: yyyyMMdd
+        job:
+          type: string
+          example: プログラマ
+        email:
+          type: string
+          example: hanako.yamada@example.com
+        phoneNumber:
+          type: string
+          example: 08012345678
+
+    MemberWithAddressRequestBody:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/MemberRequestBody'
+      properties:
+        address:
+          $ref: '#/components/schemas/MemberAddressRequestBody'
+
+    Member:
+      type: object
+      required:
+        - id
+        - createdAt
+        - updatedAt
       properties:
         id:
-          type: integer
-          format: int64
-        category:
-          $ref: '#/components/schemas/Category'
-        name:
           type: string
-          example: doggie
-        photoUrls:
-          type: array
-          xml:
-            name: photoUrl
-            wrapped: true
-          items:
-            type: string
-        tags:
-          type: array
-          xml:
-            name: tag
-            wrapped: true
-          items:
-            $ref: '#/components/schemas/Tag'
-        status:
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        firstName:
           type: string
-          description: pet status in the store
-          enum:
-            - available
-            - pending
-            - sold
-      xml:
-        name: Pet
-    ApiResponse:
-      title: An uploaded response
-      description: Describes the result of uploading an image resource
+          example: 花子
+        lastName:
+          type: string
+          example: 山田
+        firstNameKana:
+          type: string
+          example: ハナコ
+        lastNameKana:
+          type: string
+          example: ヤマダ
+        birthYmd:
+          type: string
+          example: '19850101'
+          format: yyyyMMdd
+        gender:
+          type: string
+          enum: ['male', 'female']
+          example: 'female'
+        job:
+          type: string
+          example: プログラマ
+        email:
+          type: string
+          example: hanako.yamada@example.com
+        phoneNumber:
+          type: string
+          example: 08012345678
+        loginPhoneNumber:
+          type: string
+          example: 08012345678
+        address:
+          $ref: '#/components/schemas/MemberAddress'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+    MemberOneTimeToken:
       type: object
       properties:
-        code:
-          type: integer
-          format: int32
-        type:
+        oneTimeToken:
           type: string
+          example: KUA2adPgLaDNSucthffQJNEAKdUjZ-A49Z7-Yj2sYBa-AzK32XVaQmTG-7NriJG5MF8K5tLhxmS3mu8VF6Xw9p5LAtgf-tZX
+
+    MemberAgreement:
+      type: object
+      required:
+        - memberId
+        - agreementType
+        - agreedAt
+      properties:
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        agreementType:
+          type: string
+          example: termsOfService-v20191011
+        agreedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+    AccessToken:
+      type: object
+      required:
+        - accessToken
+        - expiresAt
+      properties:
+        accessToken:
+          type: string
+          example: KUA2adPgLaDNSucthffQJNEAKdUjZ-A49Z7-Yj2sYBa-AzK32XVaQmTG-7NriJG5MF8K5tLhxmS3mu8VF6Xw9p5LAtgf-tZX
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+    MemberItemRequestBody:
+      type: object
+      required:
+        - hasOwnership
+        - locationType
+        - images
+      properties:
+        hasOwnership:
+          type: boolean
+          example: true
+        locationType:
+          type: string
+          enum: ['member', 'deliveryCompany', 'operatorsOffice']
+          example: member
+        images:
+          type: array
+          items:
+            type: string
+            example: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEYP...3kuKl7VAAAAAElFTkSuQmCC
+
+    MemberItem:
+      type: object
+      required:
+        - memberId
+        - itemId
+        - hasOwnership
+        - locationType
+        - createdAt
+        - updatedAt
+      properties:
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        itemId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        hasOwnership:
+          type: boolean
+          example: true
+        locationType:
+          type: string
+          enum: ['member', 'deliveryCompany', 'operatorsOffice']
+          example: member
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberItemPhoto'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        deletedAt:
+          type: string
+          format: date-time
+
+    MemberItemPhoto:
+      type: object
+      required:
+        - id
+        - memberId
+        - itemId
+        - imageUrl
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        itemId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        imageUrl:
+          type: string
+          format: url
+          example: https://i.imgur.com/a2mAkYQ.jpg
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+    MemberItemNegotiation:
+      type: object
+      required:
+        - id
+        - memberId
+        - itemId
+        - autoAssessingId
+        - brandName
+        - modelName
+        - reference
+        - proposedPrice
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        itemId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        brandName:
+          type: string
+          example: ROLEX
+        modelName:
+          type: string
+          example: RX1704
+        reference:
+          type: string
+          example: 180011G
+        proposedPrice:
+          type: number
+          example: 1242000
+        establishedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        closedAt:
+          type: string
+          format: date-time
+
+    MemberIdentificationPhotoRequestBody:
+      type: object
+      required:
+        - identificationType
+        - image
+      properties:
+        identificationType:
+          type: string
+          enum: ['driverLicenseCard-front', 'driverLicenseCard-back', 'selfie']
+          example: driverLicenseCard-front
+        image:
+          type: string
+          example: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEYP...3kuKl7VAAAAAElFTkSuQmCC
+
+    MemberIdentificationPhoto:
+      type: object
+      required:
+        - id
+        - memberId
+        - identificationType
+        - imageUrl
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        identificationType:
+          type: string
+          enum: ['driverLicenseCard-front', 'driverLicenseCard-back', 'selfie']
+          example: driverLicenseCard-front
+        imageUrl:
+          type: string
+          format: url
+          example: https://i.imgur.com/a2mAkYQ.jpg
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        deletedAt:
+          type: string
+          format: date-time
+
+    MemberAddressRequestBody:
+      type: object
+      required:
+        - postCode
+        - state
+        - city
+        - addressLine1
+      properties:
+        postCode:
+          type: string
+          example: 101-0001
+        state:
+          type: string
+          example: 東京都
+        city:
+          type: string
+          example: 千代田区
+        addressLine1:
+          type: string
+          example: 千代田1-1-1
+        addressLine2:
+          type: string
+          example: 千代田アパート
+        apartmentNumber:
+          type: string
+          example: 101
+
+    MemberAddress:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/MemberAddressRequestBody'
+      required:
+        - memberId
+        - createdAt
+        - updatedAt
+      properties:
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+    MemberCreditCard:
+      description: |
+        TODO 決済代行先に依存しているので多分変更になりますmm
+      type: object
+      properties:
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+    MemberBankAccountRequestBody:
+      type: object
+      required:
+        - bankName
+        - bankNumber
+        - branchName
+        - branchNumber
+        - accountType
+        - accountNumber
+        - accountName
+      properties:
+        bankName:
+          type: string
+          example: みずほ銀行
+        bankNumber:
+          type: string
+          example: "0001"
+        branchName:
+          type: string
+          example: 本店
+        branchNumber:
+          type: string
+          example: "100"
+        accountType:
+          type: string
+          enum: ['saving', 'checking']
+          example: saving
+        accountNumber:
+          type: string
+          example: "0000000"
+        accountName:
+          type: string
+          example: ヤマダ ハナコ
+
+
+    MemberBankAccount:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/MemberBankAccountRequestBody'
+      required:
+        - memberId
+        - createdAt
+        - updatedAt
+      properties:
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+    MemberToOfficeDelivery:
+      type: object
+      required:
+        - id
+        - memberId
+        - pickUpDateYmd
+        - pickUpTimeStart
+        - pickUpTimeEnd
+        - memberName
+        - memberPostCode
+        - memberAddressPhoneNumber
+        - deliveryItemIds
+        - deliveryStatus
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        memberId:
+          type: string
+          format: uuid-v4
+          description: 自分のid
+          example: a7b09d24-aec2-48e3-87bb-c1d919978fea
+        pickUpDateYmd:
+          type: string
+          example: "20191018"
+          description: YYYYMMDD(必須)
+        pickUpTimeStart:
+          type: string
+          example: "0800"
+          description: HHmm(指定なしの場合空文字)
+        pickUpTimeEnd:
+          type: string
+          example: "1200"
+          description: HHmm(指定なしの場合空文字)
+        memberName:
+          type: string
+          example: 山田花子
+        memberPhoneNumber:
+          type: string
+          example: 08012345678
+        memberPostCode:
+          type: string
+          example: 101-0001
+        memberApartmentNumber:
+          type: string
+          example: 202
+        memberAddressLine1:
+          type: string
+          example: 東京都千代田区
+        memberAddressLine2:
+          type: string
+          example: 千代田1-1-1
+        memberCity:
+          type: string
+          example: 千代田区
+        memberState:
+          type: string
+          example: 東京都
+        createdAt:
+          type: string
+          example: "2019-11-27T09:52:53.000Z"
+        updatedAt:
+          type: string
+          example: "2019-11-27T09:52:53.000Z"
+        deliveryItems:
+          type: array
+          description: |
+            集荷する商品のid。現状は1つだが、今後まとめて複数でという可能性を考慮して配列で渡す
+          items:
+            $ref: '#/components/schemas/MemberToOfficeDeliveryItem'
+        trackingNumber:
+          type: string
+          example: 0000-1111-2222
+        deliveryStatus:
+          type: string
+          enum: ['beforeDelivery', 'onDelivery', 'arrived', 'other']
+          description: |
+            - beforeDelivery 集荷前 code:31000(取込済), code:31001(伝票発行済み)
+            - onDelivery 配達中 code:31002(出荷確定)
+            - arrived 配達完了 code:31003(配達完了)
+            - other その他
+          ## api仕様の[12:出荷状況コード]に基づいています。
+          ## code:31002(出荷確定)は発送や持ち帰りや細かい状況がapi上では別途表されています
+          example: beforeDelivery
+
+    MemberToOfficeDeliveryItem:
+      type: object
+      required:
+        - memberDeliveryId
+        - itemId
+        - createdAt
+      properties:
+        memberDeliveryId:
+          type: string
+          example: c7f52fb9-6175-4310-b350-ce591ba1fd94
+        itemId:
+          type: string
+          example: 40460f68-e09c-4c0c-8da8-5715cbf46024
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        memberItemNegotiation:
+          $ref: '#/components/schemas/MemberItemNegotiation'
+
+    CreditAuthorization:
+      type: object
+      required:
+        - id
+        - memberId
+        - negotiationId
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+        negotiationId:
+          type: string
+          format: uuid-v4
+          example: bb17103f-6a65-41db-af38-edf22b3e0cf5
+        mpiStatus:
+          type: string
+          enum: ['pending', 'success', "failure"]
+        cardStatus:
+          type: string
+          enum: ['pending', 'success', "failure"]
+        createdAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2019-10-18T13:53:20Z"
+
+
+    DataUrlImage:
+      type: object
+      required:
+        - dataUrl
+      properties:
+        dataUrl:
+          type: string
+          example: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEYP...3kuKl7VAAAAAElFTkSuQmCC
+
+    MonorepoMemberAccessToken:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: KUA2adPgLaDNSucthffQJNEAKdUjZ-A49Z7-Yj2sYBa-AzK32XVaQmTG-7NriJG5MF8K5tLhxmS3mu8VF6Xw9p5LAtgf-tZX
+        memberId:
+          type: string
+          format: uuid-v4
+          example: a7b09d24-aec2-48e3-87bb-c1d919978feb
+
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
         message:
           type: string
+          example: example error occured
+
+  requestBodies:
+    MemberFindByMineyBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              mineyToken:
+                type: string
+                example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjY0MywiZXhwIjoxNTc0NDA4ODEzfQ.HB4U99XFPWchdFRweA5Pk8M_j-QkTEJhHHSoZLbC9Gw
+
+    MemberRegisterBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              smsPhoneNumber:
+                type: string
+                example: 08012345678
+
+    MemberRegisterVerifySmsBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              smsPhoneNumber:
+                type: string
+                example: 08012345678
+              verificationCode:
+                type: string
+                example: 123456
+
+    MemberLoginBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              smsPhoneNumber:
+                type: string
+                example: 08012345678
+
+    MemberLoginVerifySmsBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              smsPhoneNumber:
+                type: string
+                example: 08012345678
+              verificationCode:
+                type: string
+                example: 123456
+
+    AuthorizeCreditAuthorizationBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              veritransTokenId:
+                type: string
+                example: example-veritrans-token-id
+              redirectionUri:
+                type: string
+                example: https://qc.dev.miney.jp/complete
+
+    MemberBody:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MemberWithAddressRequestBody'
+
+    MemberItemBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            allOf:
+              - $ref: '#/components/schemas/MemberItemRequestBody'
+
+    MemberIdentificationPhotoBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            allOf:
+              - $ref: '#/components/schemas/MemberIdentificationPhotoRequestBody'
+
+    MemberCreditCardBody:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MemberCreditCard'
+
+
+    MemberBankAccountBody:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MemberBankAccountRequestBody'
+
+    MemberToOfficeDeliveryBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              pickUpDateYmd:
+                type: string
+                example: "20191018"
+                description: YYYYMMDD(必須)
+              pickUpTimeStart:
+                type: string
+                example: "0800"
+                description: HHmm(指定なしの場合空文字)
+              pickUpTimeEnd:
+                type: string
+                example: "1200"
+                description: HHmm(指定なしの場合空文字)
+              deliveryItemIds:
+                type: array
+                description: 集荷する商品のid。現状は1つだが、今後まとめて複数でという可能性を考慮して配列で渡す
+                items:
+                  type: string
+
+
+    OperatorLoginBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - emailAddress
+              - password
+            properties:
+              emailAddress:
+                type: string
+                example: operator1@example.com
+              password:
+                type: string
+                example: Icecream@31
+
+
+
+    VeritransPushNotificationBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              push_time:
+                type: string
+                format: YYYY/MM/DD hh:mm:ss
+              push_id:
+                type: string
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    order_id:
+                      type: string
+                    vresult_code:
+                      type: string
+                    transaction_type:
+                      type: string
+                    mpi_mstatus:
+                      type: string
+                    card_mstatus:
+                      type: string
+                    test_mode:
+                      type: boolean
+
+
+    VeritransCompleteBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              RequestId:
+                type: string
+              OrderId:
+                type: string
+
+  securitySchemes:
+    MemberBearerAuth:
+      type: http
+      scheme: bearer
+    OperatorBearerAuth:
+      type: http
+      scheme: bearer
+    VeritransBasicAuth:
+      type: http
+      scheme: basic
+      description: |
+        Basic RequestBodyの終端にServer Keyを連結してSha-256ハッシュした文字列
+        ref: https://www.veritrans.co.jp/developer/air/direct_mpi.html
+

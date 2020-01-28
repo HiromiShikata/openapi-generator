@@ -1,0 +1,37 @@
+{{#models}}
+    {{#model}}
+export class {{classname}} {{#parent}}extends {{{parent}}} {{/parent}}{
+        {{#vars}}
+    {{name}}{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}};
+        {{/vars}}
+
+    constructor(init: {{#hasRequired}}Pick<{{classname}}
+        ,{{#vars}}
+            {{#required}}|'{{name}}'{{/required}}
+        {{/vars}}
+    > & {{/hasRequired}}Partial<{{classname}}>) {
+        Object.assign(this, init)
+        {{#vars}}
+            {{#required}}this.{{name}} = init.{{name}}{{/required}}
+        {{/vars}}
+    }
+        }
+
+        {{#hasEnums}}
+            export namespace {{classname}} {
+            {{#vars}}
+                {{#isEnum}}
+                    export enum {{enumName}} {
+                    {{#allowableValues}}
+                        {{#enumVars}}
+                            {{name}} =
+                            <any> {{{value}}}{{^-last}},{{/-last}}
+                        {{/enumVars}}
+                    {{/allowableValues}}
+                        }
+                {{/isEnum}}
+            {{/vars}}
+                }
+        {{/hasEnums}}
+    {{/model}}
+{{/models}}

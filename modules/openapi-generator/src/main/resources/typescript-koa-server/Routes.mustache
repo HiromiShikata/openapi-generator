@@ -1,0 +1,82 @@
+import * as Router from "koa-router";
+import {Request} from "koa";
+import DummyHandler from "./DummyHandler";
+
+const router = new Router();
+
+export class User {
+    id: string
+    constructor(id: string) {
+        this.id = id
+    }
+}
+export class UnauthorizedError extends Error{
+
+}
+
+
+{{#hasAuthMethods}}
+    {{#authMethods}}
+        {{#isBasic}}
+            {{#isBasicBasic}}
+            {{/isBasicBasic}}
+            {{#isBasicBearer}}
+const {{name}} = new class {
+    authenticate = (request: Request): User => {
+        const token = request.headers.authorization
+        if (token) {
+            return new User('testuser')
+        }
+        throw new UnauthorizedError()
+    }
+}()
+            {{/isBasicBearer}}
+        {{/isBasic}}
+        {{#isApiKey}}
+        {{/isApiKey}}
+        {{#isOAuth}}
+        {{/isOAuth}}
+    {{/authMethods}}
+{{/hasAuthMethods}}
+
+{{#apiInfo}}
+    {{#apis}}
+        {{#operations}}
+            {{#operation}}
+
+
+router.{{#vendorExtensions}}{{lowercaseHttpMethod}}{{/vendorExtensions}}("{{#vendorExtensions}}{{koaRoutingPath}}{{/vendorExtensions}}", async ctx => {
+{{#hasAuthMethods}}
+    {{#authMethods}}
+        {{#isBasic}}
+            {{#isBasicBasic}}
+            {{/isBasicBasic}}
+            {{#isBasicBearer}}
+    const user = {{name}}.authenticate(ctx.request)
+            {{/isBasicBearer}}
+        {{/isBasic}}
+        {{#isApiKey}}
+        {{/isApiKey}}
+        {{#isOAuth}}
+        {{/isOAuth}}
+    {{/authMethods}}
+{{/hasAuthMethods}}
+
+{{#bodyParam}}
+{{/bodyParam}}
+{{parameters}}
+    ctx.body = await DummyHandler.{{nickname}}({{#hasAuthMethods}}user, {{/hasAuthMethods}}
+{{#pathParams}}
+    ctx.params.{{paramName}},
+{{/pathParams}}
+
+{{#bodyParam}}
+    ctx.request.body,
+{{/bodyParam}})
+});
+            {{/operation}}
+        {{/operations}}
+    {{/apis}}
+{{/apiInfo}}
+
+export default router

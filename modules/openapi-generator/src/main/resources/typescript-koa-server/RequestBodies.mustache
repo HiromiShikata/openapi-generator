@@ -1,0 +1,97 @@
+{{#openAPI}}
+{{openapi}}
+{{#components}}
+{{#requestBodies}}
+    ddd
+    {{#.}}
+        eee
+        {{#.}}
+            ggg
+            {{{.}}}
+        {{/.}}
+    {{/.}}
+aaa
+---
+{{{.}}}
+{{/requestBodies}}
+    {{/components}}
+{{/openAPI}}
+{{#apiInfo}}
+    {{#components}}
+        aaa
+        {{requestBodies}}
+        {{{.}}}
+    {{/components}}
+
+    {{#apis}}
+
+        {{#components}}
+            bbb
+            {{requestBodies}}
+            {{{.}}}
+        {{/components}}
+
+        {{#imports}}
+class {{classname}} {
+{{import}}
+// {{{.}}}
+}
+        {{/imports}}
+
+//        DummyHandler.mustache
+
+        {{#operations}}
+            {{#operation}}
+                /*
+public {{nickname}} = (
+                {{#hasAuthMethods}}
+                user: User,
+                {{/hasAuthMethods}}
+                id: string,
+                {{#bodyParam}}
+                body: {{dataType}},
+                {{/bodyParam}}
+                */
+// router.{{#vendorExtensions}}{{lowercaseHttpMethod}}{{/vendorExtensions}}("{{#vendorExtensions}}{{koaRoutingPath}}{{/vendorExtensions}}", async ctx => {
+// public async {{nickname}} ({{#allParams}}{{paramName}}{{^required}}?{{/required}}: {{{dataType}}}, {{/allParams}}
+// options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.{{#supportsES6}}IncomingMessage{{/supportsES6}}{{^supportsES6}}ClientResponse{{/supportsES6}}; {{#returnType}}body: {{{returnType}}}; {{/returnType}}{{^returnType}}body?: any; {{/returnType}} }> {
+// ctx.body = DummyHandler.{{nickname}}({{#hasAuthMethods}}user, {{/hasAuthMethods}}{{#bodyParam}}requestBody{{/bodyParam}})
+// });
+            {{/operation}}
+        {{/operations}}
+    {{/apis}}
+{{/apiInfo}}
+
+}
+export default new DummyHandler()
+
+// <-operation 6
+// {{{.}}}
+// -------
+router.post("/articles", async ctx => {
+const user = BearerAuth.authenticate(ctx.request)
+const requestBody = new ArticleBody(ctx.request.body)
+ctx.body = ArticlesHandler.post(user, requestBody)
+});
+router.get("/articles", async ctx => {
+const user = BearerAuth.authenticate(ctx.request)
+ctx.body = ArticlesHandler.get(user)
+});
+router.put("/articles/:id", async ctx => {
+const user = BearerAuth.authenticate(ctx.request)
+const id = ctx.params.id
+const requestBody = new ArticleBody(ctx.request.body)
+ArticleHandler.put(user, id, requestBody)
+});
+router.get("/articles/:id", async ctx => {
+const user = BearerAuth.authenticate(ctx.request)
+const id = ctx.params.id
+ctx.body = ArticleHandler.get(user, id)
+});
+router.delete("/articles/:id", async ctx => {
+const user = BearerAuth.authenticate(ctx.request)
+const id = ctx.params.id
+ArticleHandler.delete(user, id)
+});
+
+export default router

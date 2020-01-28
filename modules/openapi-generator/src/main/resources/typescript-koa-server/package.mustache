@@ -1,0 +1,43 @@
+{
+    "name": "{{appName}}",
+    "version": "0.0.1",
+    "description": "Koa API Server",
+    "repository": "{{gitUserId}}/{{gitRepoId}}",
+  "author": "OpenAPI-Generator Contributors",
+  "license": "Unlicense",
+  "main": "dist/api.js",
+  "types": "dist/api.d.ts",
+  "scripts": {
+    "clean": "rm -Rf node_modules/ *.js",
+    "build": "tsc",
+    "test": "npm run build && node dist/client.js",
+    "format:ts": "prettier --parser typescript --write src/**/*.ts",
+    "format:json": "prettier --parser json --write **/*.json",
+    "format:tslint": "tslint --project tsconfig.json --fix",
+    "format": "npm run format:tslint && npm run format:ts && npm run format:json",
+    "lint": "tslint --project tsconfig.json",
+    "start": "ts-node src/App.ts",
+    "dev": "nodemon src/App.ts"
+  },
+  "dependencies": {
+    "koa": "^2.10.0",
+    "koa-bodyparser": "^4.2.1",
+    "koa-router": "^7.4.0",
+    "bluebird": "^3.5.0",
+    "request": "^2.81.0",
+    "@types/bluebird": "*",
+    "@types/request": "*",
+    "rewire": "^3.0.2"
+
+  },
+  "devDependencies": {
+    "@types/koa": "^2.0.50",
+    "@types/koa-bodyparser": "^4.3.0",
+    "@types/koa-router": "^7.0.42",
+    "@types/node": "^12.11.1",
+    "nodemon": "^1.19.4",
+    "ts-node": "^8.4.1",
+    "typescript": "^3.6.4"
+  }
+}
+
